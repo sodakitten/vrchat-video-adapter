@@ -45,22 +45,22 @@ Do not re-encode on a hunch. Measure source and output **per channel** over one 
 
 ## Burning in subtitles
 
-A full video re-encode; say so and get consent when the user only asked for a remux. Extract to `.srt`, convert to `.ass`, set a CJK font and `PlayResX`/`PlayResY` or Chinese renders as tofu boxes, then `-vf "subtitles=sub.ass"` with the work directory as the process CWD (relative filter paths resolve against the CWD, **not** the input's); check a frame with dialogue on screen. Exact commands, the style line and the escaped absolute path form: [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md). A muxed Chinese track is often machine-translated; sourcing a better one: [references/subtitle-sourcing.md](references/subtitle-sourcing.md).
+A full video re-encode; say so and get consent when the user only asked for a remux. Extract to `.srt`, convert to `.ass`, set a CJK font and `PlayResX`/`PlayResY` or Chinese renders as tofu boxes, then `-vf "subtitles=sub.ass"` with the work directory as the process CWD (relative filter paths resolve against the CWD, **not** the input's); check a frame with dialogue on screen. Exact commands, the style line and the escaped absolute path form: [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md). A muxed Chinese track is often machine-translated; sourcing a better one: [references/subtitle-sourcing.md](references/subtitle-sourcing.md). Fix a candidate's timeline with [scripts/align-subtitles.ps1](scripts/align-subtitles.ps1) and burn it with [scripts/burn-subs.ps1](scripts/burn-subs.ps1).
 
 ## Raising the frame rate (interpolation)
 
 Match the headset, not 60. At 90 Hz, 45 and 30 fps divide evenly (a frame per 2 or 3 refreshes) while 60 fps gives 3:2 judder; at 72 Hz, 24 does. 1080p45 is Level 4.2 — inside VRChat's ceiling.
 
-`rife-ncnn-vulkan` runs headless on current NVIDIA cards (verified on an RTX 5080 Laptop; ignore claims that Blackwell needs a rebuild). It is worth it: ffmpeg's `minterpolate` manages ~3 fps of 1080p output (34 hours for a 2h12m film) against ~3.4 hours for the chunked RIFE pipeline, which needs frame files on disk but only ~1 GB at a time. Expect ~1.5x the video bitrate at 45 fps, not the 1.9x the frame count suggests. Chunk arithmetic, measurements and pitfalls: [references/frame-interpolation.md](references/frame-interpolation.md); driver: [scripts/interpolate-rife.ps1](scripts/interpolate-rife.ps1). Keep a subtitle-free 45fps master: burning a variant is one NVENC pass, re-interpolating is hours.
+`rife-ncnn-vulkan` runs headless on current NVIDIA cards (verified on an RTX 5080 Laptop; ignore claims that Blackwell needs a rebuild), and it is worth it: ffmpeg's `minterpolate` manages ~3 fps of 1080p output (34 hours for 2h12m) against ~3.4 hours for the chunked pipeline. Expect ~1.5x the video bitrate at 45 fps, not the 1.9x the frame count suggests. Chunk arithmetic, measurements and pitfalls: [references/frame-interpolation.md](references/frame-interpolation.md); driver: [scripts/interpolate-rife.ps1](scripts/interpolate-rife.ps1). Keep a subtitle-free 45fps master: burning a variant is one NVENC pass, re-interpolating is hours.
 
 ## Verify before delivering
 
-Report measured facts: stream table, duration matching the source, chapter count, `moov` offset near the start, a full decode exiting 0, the audio's `CanTranscode`, and a frame when subtitles were burned. Prefer an ASCII filename — VRChat fetches over HTTP and the world needs **Allow Untrusted URLs** enabled.
+Report measured facts: stream table, duration matching the source, chapter count, `moov` offset near the start, a full decode exiting 0, the audio's `CanTranscode`, and a frame when subtitles were burned. Prefer an ASCII filename: the world needs **Allow Untrusted URLs**.
 
 ## Pitfalls
 
 - ffmpeg 9 removed `-vsync`: use `-fps_mode passthrough|cfr|vfr`.
-- ffmpeg writes a dangling `tref/chap` chapter reference when the source has chapters and metadata is stripped; add `-map_chapters -1` (`-map_metadata -1` alone does not, and it also wipes chapter titles).
+- ffmpeg writes a dangling `tref/chap` reference when the source has chapters and metadata is stripped; add `-map_chapters -1` (`-map_metadata -1` alone does not).
 - `-ss` before `-i` resets output timestamps, so the `subtitles` filter then shows the wrong cues. For a sample, encode from 0 and cut the frame later, or add `-copyts`.
 - `Start-Process -ArgumentList` joins an array unquoted, so a path with spaces splits and its tail binds to the next parameter. Pass one quoted string, or a zero-argument launcher `.ps1` (UTF-8 **with BOM**) holding the paths.
 - `$ErrorActionPreference = 'Stop'` turns *any* native stderr line into a terminating error, so a tool that only prints a banner to stderr (rife-ncnn-vulkan) looks like it failed. Let `cmd /c "... > log 2>&1"` own the redirection.
