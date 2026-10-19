@@ -88,6 +88,11 @@ These produce wrong results without an error at the PowerShell level, so the ffm
 | Trap | Symptom |
 |---|---|
 | a function parameter named `$input` (an automatic variable) | `-i $input` expands to nothing; ffmpeg reports `Error opening input file -map` |
+| a function parameter named `$args` (also automatic) | `@args` expands to nothing, so ffmpeg runs with **zero** arguments and every call looks like an unexplained failure |
+| **variable names are case-insensitive** | a local `$vid` clobbers a `$Vid` parameter: `-i $Vid … $vid` becomes output-as-input, and ffmpeg reports `Error opening input file <the output path>` |
 | a function named `Measure`, `Select`, `Where`, `Sort`, `Group`, `ForEach` | resolves to the built-in alias, so your function never runs |
+| non-ASCII written into a script — **including a parameter default** | 5.1 reads the BOM-less file as ANSI, so `D:\电影\` becomes `D:\鐢靛奖\` and every path "does not exist". Keep scripts ASCII and pass such paths as arguments; the command line itself is Unicode-safe |
+| a helper that logs with `Write-Output` and also returns a value | the log lines join the return value, so `if ($result)` is true even on failure and a broken run reports success. Log with `Write-Host`, return only the boolean |
+| `Get-ChildItem -Filter` given an array | `Cannot convert 'System.Object[]' to the type 'System.String'`; use one pattern, or `-Include` with `-Recurse`, or filter with `Where-Object` |
 | `$o = & ffmpeg ... 2>&1` in Windows PowerShell 5.1 | native stderr arrives as ErrorRecords asynchronously and can be attributed to the *next* command; redirect to a file (`2> out.txt`) and parse the file instead |
 | reading a `.ps1` without a BOM as a script | non-ASCII becomes mojibake under 5.1; keep helper scripts ASCII-only |

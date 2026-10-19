@@ -49,6 +49,57 @@ Sources:
 - [Supported codecs — Windows apps, Microsoft Learn](https://learn.microsoft.com/en-us/windows/apps/develop/media-authoring-processing/supported-codecs)
 - [Dolby Audio Decoder — Win32 apps, Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/medfound/dolby-audio-decoder)
 
+## What a machine actually decodes (measured, not assumed)
+
+The table above is what the *engine* can use. What a given PC can use depends on which media
+codec packages are installed from the Store, so inventory the machine before ruling anything out:
+
+```powershell
+Get-AppxPackage | Where-Object { $_.Name -match 'HEVC|AV1|VP9|WebMedia|MPEG2|MediaExtensions' } |
+  Select-Object Name, Version
+```
+
+| Package | What it adds to Media Foundation |
+|---|---|
+| `Microsoft.WebMediaExtensions` | **MKV / WebM containers**, Vorbis, Opus, Theora |
+| `Microsoft.HEVCVideoExtension` | HEVC/H.265 decode |
+| `Microsoft.VP9VideoExtensions` | VP9 decode |
+| `Microsoft.AV1VideoExtension` | AV1 decode |
+
+Measured matrix — Windows 11 24H2, Intel Arc A770, all four packages installed. Each row is a
+10 s file of real H.264 1080p plus one audio track, run through `scripts/probe-wmf-audio.ps1`:
+
+| Container | Audio | Verdict |
+|---|---|---|
+| MP4 | AAC-LC 5.1 (6 ch) | DECODABLE |
+| MKV | AAC-LC 5.1 | DECODABLE |
+| MOV | AAC-LC 5.1 | DECODABLE |
+| MPEG-TS | AAC-LC 5.1 | DECODABLE |
+| MP4 / MKV | **AAC-LC 8 ch (7.1)** | **NOT DECODABLE** — Windows' AAC decoder has no 7.1 |
+| MKV | FLAC 5.1 (6 ch) | DECODABLE |
+| MKV / MP4 | **FLAC 8 ch (7.1)** | **DECODABLE** — the only route to a true 7.1 track |
+| MKV | Vorbis 5.1 | DECODABLE (AVPro's table says no) |
+| MKV | Opus 5.1 **and** 7.1 | NOT DECODABLE (AVPro's table says yes) |
+| MKV | AC-3 5.1 | NOT DECODABLE (24H2 removed the decoder; AVPro's "yes" predates that) |
+| MKV | TrueHD 7.1 | NOT DECODABLE |
+
+Three conclusions:
+
+- **MKV is playable on PC** once Web Media Extensions is installed. Preferring MP4 in the
+  workflow is about *delivery certainty* — Quest and iOS cannot play MKV, and the next PC may
+  lack the package — not about a hard PC limit.
+- **AAC stops at 5.1.** A 7.1 AAC track is simply not decodable, so an 8-channel AAC deliverable
+  is a silent one. If 8 channels are genuinely wanted, FLAC in MKV is the only codec here that
+  decodes.
+- **Check whether the "7.1" is real before paying for it.** One remux's 7.1 TrueHD measured
+  SL/SR at −91 dB (digital silence) while its 5.1 AC-3 carried the same six channels within
+  1 dB — a 5.1 mix in a 7.1 wrapper. Measure over an *action* scene, not a quiet dialogue
+  scene, and per channel: `-af "pan=mono|c0=cN,volumedetect"` (see
+  [audio-fidelity-diagnostics.md](audio-fidelity-diagnostics.md)).
+
+Delivery default stays **MP4 + H.264 8-bit + AAC-LC ≤5.1**: no Store package needed, works on
+every platform, and it is what `verify-vrchat-mp4.ps1` asserts.
+
 ## Playback in VRChat itself
 
 VRChat video players consume a **URL**, not a file path. Local files are served by pointing the player at a local HTTP server; `file://` is not a general solution. The setting to allow non-whitelisted hosts is **Allow Untrusted URLs**, and Quest clients require HTTPS.
