@@ -1,7 +1,7 @@
 ---
 name: vrchat-video-encode
-description: Turn a local video (MKV, MP4, WEB-DL, ...) into an MP4 that VRChat can actually play, using ffmpeg. It covers probing the source, copying the video stream when it is already VRChat-safe, transcoding audio VRChat cannot decode (E-AC-3/DDP, AC-3, DTS, TrueHD, FLAC) to AAC, burn in subtitles, raise the frame rate with RIFE, verify the result. Also covers "the audio sounds wrong in VRChat" — proving whether the encode or the player's 5.1 downmix is at fault, then delivering a stereo track. Use for a VRChat-compatible/Quest-safe MP4, burned-in subtitles, smoother playback, or reports of no sound or odd-sounding audio in VRChat.
-whenToUse: The user asks to transcode/compress/remux a video for VRChat or a VRChat world, asks whether VRChat supports a given codec, wants it smoother or interpolated to a higher frame rate, or reports silence, no audio, or strange-sounding dialogue for a video played in VRChat.
+description: Turn a local video (MKV, MP4, WEB-DL, ...) into an MP4 that VRChat can actually play, using ffmpeg. It covers probing the source, copying the video stream when it is already VRChat-safe, transcoding audio VRChat cannot decode (E-AC-3/DDP, AC-3, DTS, TrueHD, FLAC) to AAC, burn in subtitles or danmaku (弹幕), raise the frame rate with RIFE, verify the result. Also covers "the audio sounds wrong in VRChat" — proving whether the encode or the player's 5.1 downmix is at fault, then delivering a stereo track. Use for a VRChat-compatible/Quest-safe MP4, burned-in subtitles, smoother playback, or reports of no sound or odd-sounding audio in VRChat.
+whenToUse: The user asks to transcode/compress/remux a video for VRChat or a VRChat world, asks whether VRChat supports a given codec, wants it smoother or interpolated to a higher frame rate, or reports silence, no audio, or strange-sounding dialogue for a video played in VRChat, or asks for danmaku (弹幕) to go with a video.
 ---
 
 # VRChat video encoding
@@ -46,6 +46,10 @@ Do not re-encode on a hunch. Measure source and output **per channel** over one 
 ## Burning in subtitles
 
 A full video re-encode; say so and get consent when the user only asked for a remux. Extract to `.srt`, convert to `.ass`, set a CJK font and `PlayResX`/`PlayResY` or Chinese renders as tofu boxes, then `-vf "subtitles=sub.ass"` with the work directory as the process CWD (relative filter paths resolve against the CWD, **not** the input's); check a frame with dialogue on screen. Exact commands, the style line and the escaped absolute path form: [references/ffmpeg-recipes.md](references/ffmpeg-recipes.md). A muxed Chinese track is often machine-translated; sourcing a better one: [references/subtitle-sourcing.md](references/subtitle-sourcing.md). Fix a candidate's timeline with [scripts/align-subtitles.ps1](scripts/align-subtitles.ps1) and burn it with [scripts/burn-subs.ps1](scripts/burn-subs.ps1).
+
+## Danmaku (弹幕)
+
+VRChat renders no sidecar, so danmaku are either burned into the picture (another full encode) or handed over as XML/ASS for local players (`DanmakuFactory -i x.xml -o x.ass`, then `mpv --sub-file=x.ass`). When a show has been delisted from Bilibili, **dandanplay (弹弹play) still holds the archived Bilibili comments**: 2,200 / 2,794 / 2,417 / 2,069 for four episodes where Tucao had 135 / 51 / 84 / 105 and every other source had none. Reach it through the open-source `danmu_api` server (`/api/v2/search/episodes?anime=<kw>&episode=<N>`, then `/api/v2/comment/<episodeId>` **immediately** — the ids are session-scoped and a wrong one returns the same `{"count":0}` as an empty source); driver: [scripts/fetch-danmaku.ps1](scripts/fetch-danmaku.ps1). Before burning, prove the timeline from the ASS's own OP/ED cue times — matching the text does not work. Setup, traps and the sources that do not work: [references/danmaku-sourcing.md](references/danmaku-sourcing.md).
 
 ## Raising the frame rate (interpolation)
 
