@@ -199,6 +199,37 @@ Pick the timestamp from **inside** a cue: parse the ASS for start/end and take t
 frame sampled at the exact cue start can still show the outgoing picture, since one frame is
 42 ms at 23.976 fps — a clean frame there proves nothing.
 
+### 3f. Pick the subtitle track per file, and verify the whole track
+
+`0:s:N` is an ordinal inside that file, and releases do not keep it stable across a season. Measured
+in one 10-episode batch: eight episodes had six subtitle streams (`中文（简体）` at ordinal 4), but two
+added a `日本語 [Forced]` track at ordinal 1, which pushed the Simplified track to **5** — a hardcoded
+`0:s:4` silently burned the **Japanese [CC]** track into exactly those two episodes.
+
+Resolve it from the tags, keeping the helper ASCII-only by testing the 繁 code point:
+
+```powershell
+$j = (& $ffprobe -v error -select_streams s -show_entries stream=index:stream_tags=language,title -of json $src | ConvertFrom-Json)
+$trad = [string][char]0x7E41      # 繁 — keeps the script ASCII
+$i = 0; $pick = -1
+foreach ($s in $j.streams) {
+  if ("$($s.tags.language)" -eq 'chi' -and "$($s.tags.title)" -notlike "*$trad*") { $pick = $i; break }
+  $i++
+}
+```
+
+Then prove the track itself, not one frame — extract it and count kana:
+
+```powershell
+& $ff -y -i $src -map 0:s:$pick -c:s srt $wd\sub.srt
+$cues = @(Get-Content $wd\sub.srt -Encoding UTF8 | Select-String '^\d\d:\d\d:\d\d,\d\d\d --> ').Count
+$kana = @(Get-Content $wd\sub.srt -Encoding UTF8 | Select-String '[\u3040-\u30FF]').Count
+```
+
+A Chinese track reports ~0 % kana; the Japanese `[CC]` track here reported 98 % (485 of 493 lines).
+Cross-check `$cues` against the source's per-stream `NUMBER_OF_FRAMES` tag, which names the track you
+actually grabbed (493 = `日本語 [CC]`, 411 = `中文（简体）`).
+
 
 ## 4. Choose the encoder by measurement
 
