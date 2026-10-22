@@ -67,6 +67,10 @@ foreach ($src in $Sources) {
   $m4a = Join-Path $Wd ("ep" + $nn + ".m4a")
   $vid = Join-Path $Wd ("ep" + $nn + ".video.mp4")
   $outFile = Join-Path $OutDir ($OutPrefix + " " + $tag + " VRChat.mp4")
+  # 成果一律进"按作品命名"的子文件夹，不再散落在输出目录根部
+  $titleDir = Join-Path $OutDir ($OutPrefix + " VRChat")
+  if (-not (Test-Path -LiteralPath $titleDir)) { New-Item -ItemType Directory -Path $titleDir -Force | Out-Null }
+  $outFile = Join-Path $titleDir ($OutPrefix + " " + $tag + " VRChat.mp4")
 
   # ---- 1. subtitle: pick the stream, extract SRT, convert to ASS, restyle ----
   $subIdx = $SubStream
