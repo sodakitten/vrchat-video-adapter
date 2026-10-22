@@ -119,6 +119,22 @@ needs **Allow Untrusted URLs**.
 If a measurement contradicts the plan, say so and re-measure before shipping — a wrong number
 reported confidently is worse than an extra ten minutes.
 
+## Where the output goes
+
+Put every finished file in a **per-title folder**, never loose in the output root:
+
+```
+D:\电影\<Title> VRChat\          e.g. D:\电影\赛博朋克：边缘行者 第二季 VRChat\
+    <Title> S02E01 VRChat.mp4    a series ships as one folder of episodes
+    <Title>.mp4                  a film ships as one folder of its versions
+    <Title>.7.1.mp4 / .5.1.mp4   keep variants side by side in that folder
+```
+
+Name the folder after the work, not after the task date, and create it inside the script (the
+`vrc-cyber.ps1` batch script does) rather than by hand afterwards, so a later run cannot scatter
+files at the root again. When a title already has loose files, move them in and say how many you
+moved — do not leave a half-migrated title in two places.
+
 ## Pitfalls
 
 - **`-disposition:a:0 default` does not decide what VRChat plays.** A two-track MP4 (track 1 `eng` with `default=1`, track 2 `chi` with `default=0`) played the **Chinese** track in VRChat. Whatever AVPro uses — enumeration order, a locale match, an ignored disposition — the reliable answer is to leave nothing to choose: map one audio stream and drop the alternates. A second track is a trap even when it is the undecodable original, since picking it means silence. Verify with `ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 <out>`.
