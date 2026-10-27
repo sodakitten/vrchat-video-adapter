@@ -286,6 +286,47 @@ The hardware path is ~40 % faster but not bit-identical to the reference decoder
 frame compared at **PSNR 43.8 dB / SSIM 0.988**, i.e. 10-bit→8-bit rounding. Either is fine for
 delivery; take software decode when you want the reference result and can spare the minutes.
 
+### Probe the encoder before you trust the table
+
+These numbers come from one machine. Encoder availability is *not* a property of the ffmpeg build —
+`h264_qsv`, `h264_nvenc` and `h264_amf` are compiled in on every platform and then fail at session
+creation when the matching GPU is absent. Measured here on an AMD RX 7900 XTX + Ryzen 5 9600X:
+`-init_hw_device qsv=hw` reported `Failed to find d3d11va adapter by vendor id 0x8086`, and
+`h264_qsv` alone reported `Error creating a MFX session: -9` only *after* the input had been opened
+and decoded, so a 60 s benchmark "finished" in 0.2 s having written nothing. Always smoke-test with
+a generated clip, which fails in one second instead of forty minutes into a batch:
+
+```powershell
+& $ff -v warning -y -f lavfi -i testsrc=size=1920x1080:rate=24 -frames:v 48 -c:v h264_amf -quality quality -f mp4 <work>\t.mp4
+```
+
+Then check `Get-CimInstance Win32_VideoController` for the vendor actually present. On this AMD
+machine `h264_amf -quality quality -rc cqp` worked, and over a 60 s action segment it was 3x faster
+than x264 but needed ~25 % more bitrate for ~0.001 less SSIM (`q20`: 5427 kbps / 0.9906 against
+`libx264 -preset slow -crf 19`: 3947 kbps / 0.9919) — a fair trade for a batch, a poor one for a
+single film. Measure the vendor's encoder against x264 on *your* footage; do not transplant either
+column.
+
+### Cap the bitrate, or a long film becomes 10 GB
+
+CRF targets quality per frame, so the **total** is whatever the footage demands: a dark dialogue
+scene at CRF 21 costs 1.7 Mbps while the same film's action costs 5.5 Mbps, and two hours of the
+latter lands near 5 GB before you have decided anything. Adding `-maxrate`/`-bufsize` turns it into
+capped CRF — the rate is respected where it matters and CRF still owns the bit allocation:
+
+```powershell
+-c:v libx264 -preset medium -crf 21 -maxrate 4500k -bufsize 9000k -x264-params nal-hrd=vbr
+```
+
+Measured on an action segment of a 4K hardsubbed source: uncapped 5,427 kbps / SSIM 0.9906 at
+`-preset slow`, capped 3,210 kbps / SSIM 0.9903 at `-preset medium`. The cap barely fired in the
+easy parts and the quality cost was ~0.0003 — while the encode ran at 76 fps instead of 30. State
+both numbers when the user asks why the file is not bigger; "the source only supports this much"
+is a measurement, not an excuse.
+
+Also decide the resolution by the *display*: 1080p from a 4K master is a 1.78x downscale that costs
+nothing visually in a headset, and it is what makes a 2.5 h film fit in 3.5 GB.
+
 ## 5. Verify the result
 
 ```powershell
